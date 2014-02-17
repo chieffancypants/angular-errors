@@ -19,15 +19,6 @@ angular.module('cfp.error', [])
    * and post the error to an external service
    */
   .config(function ($provide) {
-    'use strict';
-
-    /**
-     * Keep a cache of recent errors so we can do things like debouncing and
-     * aggregating errors into a single post
-     *
-     * @type {Array}
-     */
-    var errorCache = [];
 
     /**
      * Error object to standardize everything
@@ -36,7 +27,7 @@ angular.module('cfp.error', [])
      * @param  {[type]} opts      [description]
      * @return {[type]}           [description]
      */
-    function ErrorReport(exception, cause, opts) {
+    function ErrorReport (exception, cause, opts) {
       this.exception = exception;
       this.cause = cause;
       this.opts = opts;
@@ -46,7 +37,6 @@ angular.module('cfp.error', [])
 
       return function (exception, cause) {
         var errorReport = new ErrorReport(exception, cause);
-        errorCache.push(errorReport);
         errorService.post(errorReport);
         $log.error.apply($log, arguments);
       };
@@ -60,19 +50,51 @@ angular.module('cfp.error', [])
    * to customize the post payload
    */
   .provider('errorService', function() {
+
     this.postUri = null;
+    this.throttle = 5000;
+
+    /**
+     * Keep a cache of recent errors so we can do things like debouncing and
+     * aggregating errors into a single post
+     *
+     * @type {Array}
+     */
+    var errors = [];
+
+
 
     this.$get = ['$injector', function ($injector) {
-      var $http, $q;
+      var $http, $q, $timeout;
+      var isThrottled = false;
+
+      var resolveDependencies = function() {
+        $http = $http || $injector.get('$http');
+        $q = $q || $injector.get('$q');
+        $timeout = $timeout || $injector.get('$timeout');
+      };
 
       return {
         post: function (errorReport) {
-          $http = $http || $injector.get('$http');
-          $q = $q || $injector.get('$q');
+          var uri = this.postUri;
+          resolveDependencies();
+          errors.push(errorReport);
 
-          // $http.post(this.postUri, errorReport);
+          if (isThrottled) {
+            return;
+          }
+
+          $timeout(function(){
+            $http.post(uri, errors);
+            errors = [];
+            isThrottled = false;
+          }, this.throttle);
+
+          isThrottled = true;
+
         },
-        postUri: this.postUri
+        postUri: this.postUri,
+        throttle: this.throttle
       };
     }];
 
