@@ -18,7 +18,7 @@ angular.module('cfp.error', [])
    * Decorate Angular's $exceptionHandler service to easily hook into the log
    * and post the error to an external service
    */
-  .config(function ($provide) {
+  .config(['$provide', function ($provide) {
 
     /**
      * Error object to standardize everything
@@ -42,7 +42,7 @@ angular.module('cfp.error', [])
       };
 
     }]);
-  })
+  }])
 
 
   /**
