@@ -27,16 +27,24 @@ angular.module('cfp.error', [])
      * @param  {[type]} opts      [description]
      * @return {[type]}           [description]
      */
-    function ErrorReport (exception, cause, opts) {
+    function ErrorReport (exception, cause, ua) {
       this.exception = exception;
       this.cause = cause;
-      this.opts = opts;
+      this.ua = ua;
+      this.count = 1;
     }
 
-    $provide.decorator('$exceptionHandler', ['$delegate', '$log', 'errorService', function ($delegate, $log, errorService) {
+
+    $provide.decorator('$exceptionHandler', ['$delegate', '$log', '$window', 'errorService', function ($delegate, $log, $window, errorService) {
 
       return function (exception, cause) {
-        var errorReport = new ErrorReport(exception, cause);
+        var ua;
+
+        if ($window.navigator && $window.navigator.userAgent) {
+          ua = $window.navigator.userAgent;
+        }
+
+        var errorReport = new ErrorReport(exception, cause, ua);
         errorService.post(errorReport);
         $log.error.apply($log, arguments);
       };
@@ -63,22 +71,43 @@ angular.module('cfp.error', [])
     var errors = [];
 
 
-
-    this.$get = ['$injector', function ($injector) {
+    this.$get = ['$injector', '$window', function ($injector, $window) {
       var $http, $q, $timeout;
       var isThrottled = false;
 
       var resolveDependencies = function() {
-        $http = $http || $injector.get('$http');
-        $q = $q || $injector.get('$q');
+        $q       = $q       || $injector.get('$q');
+        $http    = $http    || $injector.get('$http');
         $timeout = $timeout || $injector.get('$timeout');
+      };
+
+      /**
+       * Only add unique errors.  any duplicates should iterate the errorCount property of the ErrorReport
+       * @param  {ErrorReport} errorReport The error report
+       */
+      var pushError = function(errorReport) {
+        var push = true;
+
+        for (var i = 0; i < errors.length; i++) {
+          // TODO: profile this:
+          if (errorReport.exception.stack === errors[i].exception.stack) {
+            push = false;
+            errors[i].count++;
+          }
+        }
+
+        if (push) {
+          errors.push(errorReport);
+        }
+
       };
 
       return {
         post: function (errorReport) {
           var uri = this.postUri;
           resolveDependencies();
-          errors.push(errorReport);
+          pushError(errorReport);
+          // errors.push(errorReport);
 
           if (isThrottled) {
             return;
