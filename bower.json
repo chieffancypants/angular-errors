@@ -1,0 +1,14 @@
+{
+  "name": "angular-errors",
+  "version": "0.0.1",
+  "main": [
+    "src/error.js"
+  ],
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "components",
+    "test",
+    "example"
+  ]
+}
